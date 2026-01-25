@@ -7,7 +7,7 @@
 <style>
     :root { --primary: #ff6b12; --danger: #ff4757; --accent: #f1c40f; }
     
-    * { touch-action: manipulation; user-select: none; -webkit-tap-highlight-color: transparent; }
+    * { touch-action: none; user-select: none; -webkit-tap-highlight-color: transparent; }
     
     body { margin:0; overflow:hidden; background:#111; font-family: 'Arial', sans-serif; display: flex; justify-content: center; align-items: center; height: 100vh; }
     
@@ -22,7 +22,7 @@
 
     #ui { 
         position:absolute; top:0; left:0; width:100%; padding: 12px; box-sizing: border-box;
-        display: flex; justify-content: space-between; background: rgba(0, 0, 0, 0.8); z-index: 50;
+        display: flex; justify-content: space-between; background: rgba(0, 0, 0, 0.7); z-index: 50;
     }
     .stat-value { font-size: 18px; font-weight: bold; color: var(--accent); }
 
@@ -31,6 +31,7 @@
         background-image: url('الطبق.png'); background-size: contain;
         background-repeat: no-repeat; background-position: center;
         z-index: 5;
+        transition: transform 0.1s;
     }
 
     .platform { 
@@ -38,18 +39,9 @@
         background: #eee; border-radius:10px; box-shadow: 0 4px 6px rgba(0,0,0,0.4); 
     }
 
-    /* أزرار التحكم - جعلتها أوضح بكثير */
-    #controls {
-        position: absolute; bottom: 30px; left: 0; width: 100%;
-        display: flex; justify-content: space-evenly; z-index: 100;
-    }
-    .touch-btn {
-        width: 80px; height: 80px; background: rgba(255, 107, 18, 0.9); /* برتقالي غامق واضح */
-        border-radius: 15px; display: flex; justify-content: center; align-items: center;
-        color: white; font-size: 35px; border: 3px solid #fff;
-        box-shadow: 0 5px 15px rgba(0,0,0,0.5);
-    }
-    .touch-btn:active { background: #fff; color: var(--primary); }
+    /* مناطق اللمس المخفية */
+    #touch-left { position: absolute; left: 0; top: 0; width: 50%; height: 100%; z-index: 80; }
+    #touch-right { position: absolute; right: 0; top: 0; width: 50%; height: 100%; z-index: 80; }
 
     .overlay { 
         position:absolute; inset:0; 
@@ -73,7 +65,6 @@
         border-radius: 10px; font-weight: bold;
         box-shadow: 0 4px 0 #a3450b;
     }
-    .btn:active { transform: translateY(4px); box-shadow: none; }
 
     @media (max-width: 500px) {
         #game { width: 100vw; height: 100vh; border: none; border-radius: 0; }
@@ -90,22 +81,19 @@
 
     <div id="player" class="player"></div>
 
-    <div id="controls">
-        <div class="touch-btn" id="btnLeft">◀</div>
-        <div class="touch-btn" id="btnJump">نط</div>
-        <div class="touch-btn" id="btnRight">▶</div>
-    </div>
+    <div id="touch-left"></div>
+    <div id="touch-right"></div>
 
     <div id="startScreen" class="overlay">
         <h1 style="color:var(--accent); font-size: 45px; margin-bottom:5px;">كشري الوزير</h1>
-        <p style="margin-bottom:30px; font-size: 20px;">جاهز تغرف أحلى طبق؟</p>
-        <button id="startBtn" class="btn">افتح المحل (ابدأ)</button>
+        <p style="margin-bottom:30px; font-size: 18px;">المس يمين أو شمال للتحرك<br>الطبق بينط لوحده!</p>
+        <button id="startBtn" class="btn">افتح المحل</button>
     </div>
 
     <div id="gameOverScreen" class="overlay">
-        <h1 style="color:var(--danger); font-size: 40px;">القدرة خلصت!</h1>
-        <p style="font-size: 22px;">جمعت حساب: <span id="finalScore" style="color:var(--accent)">0</span> جنية</p>
-        <button id="restartBtn" class="btn">شغل البوتجاز تاني</button>
+        <h1 style="color:var(--danger); font-size: 40px;">الصلصة شاطتت</h1>
+        <p style="font-size: 22px;">الاسكور: <span id="finalScore" style="color:var(--accent)">0</span></p>
+        <button id="restartBtn" class="btn">اغرف من جديد</button>
     </div>
 </div>
 
@@ -115,14 +103,13 @@ const playerEl = document.getElementById('player');
 const scoreVal = document.getElementById('scoreVal');
 const speedVal = document.getElementById('speedVal');
 
-// تم تقليل القيم هنا لجعل اللعبة أبطأ وأسهل
 let config = {
-    gravity: 0.5,        // كانت 0.7 (أخف شوية)
-    jumpForce: -13,      // كانت -16 (قفزة أهدى)
-    moveSpeed: 1.2,      // كانت 1.5 (تحكم أدق)
-    friction: 0.85,
-    baseScrollSpeed: 1.2,// كانت 1.8 (الكاميرا أبطأ)
-    difficultyScale: 0.0004 // كانت 0.0008 (الصعوبة بتزيد ببطء)
+    gravity: 0.4,
+    jumpForce: -12,
+    moveSpeed: 6, // سرعة الحركة الجانبية
+    friction: 0.8,
+    baseScrollSpeed: 1.0,
+    difficultyScale: 0.0005
 };
 
 let state = {
@@ -131,26 +118,28 @@ let state = {
     score: 0,
     gameActive: false,
     scrollSpeed: config.baseScrollSpeed,
-    platforms: []
+    platforms: [],
+    movingLeft: false,
+    movingRight: false
 };
 
 function initPlatforms() {
     state.platforms = [];
     game.querySelectorAll('.platform').forEach(p => p.remove());
-    createPlatform(50, 520, 300, 'normal'); 
+    // منصة البداية تكون كبيرة ومضمونة
+    createPlatform(50, 500, 300, 'normal'); 
     for(let i = 1; i < 7; i++) {
-        spawnPlatform(520 - (i * 105));
+        spawnPlatform(500 - (i * 110));
     }
 }
 
 function spawnPlatform(yPos) {
     let type = 'normal';
-    if (state.score >= 400) {
+    if (state.score >= 300) {
         let rand = Math.random();
         if (rand > 0.8) type = 'moving';
-        else if (rand > 0.6) type = 'breakable';
     }
-    createPlatform(Math.random() * (game.clientWidth - 110), yPos, 110, type);
+    createPlatform(Math.random() * (game.clientWidth - 100), yPos, 100, type);
 }
 
 function createPlatform(x, y, width, type) {
@@ -158,25 +147,25 @@ function createPlatform(x, y, width, type) {
     el.className = 'platform ' + type;
     el.style.width = width + 'px';
     game.appendChild(el);
-    state.platforms.push({ el, x, y, w: width, h: 12, type, dir: Math.random() > 0.5 ? 1 : -1, broken: false });
+    state.platforms.push({ el, x, y, w: width, h: 12, type, dir: Math.random() > 0.5 ? 1 : -1 });
 }
 
-let keys = {};
-window.onkeydown = e => keys[e.code] = true;
-window.onkeyup = e => keys[e.code] = false;
+// التحكم باللمس
+document.getElementById('touch-left').ontouchstart = (e) => { e.preventDefault(); state.movingLeft = true; };
+document.getElementById('touch-left').ontouchend = () => state.movingLeft = false;
 
-const touchControls = {
-    'btnLeft': 'ArrowLeft',
-    'btnRight': 'ArrowRight',
-    'btnJump': 'ArrowUp'
+document.getElementById('touch-right').ontouchstart = (e) => { e.preventDefault(); state.movingRight = true; };
+document.getElementById('touch-right').ontouchend = () => state.movingRight = false;
+
+// دعم لوحة المفاتيح أيضاً
+window.onkeydown = e => {
+    if(e.code === 'ArrowLeft') state.movingLeft = true;
+    if(e.code === 'ArrowRight') state.movingRight = true;
 };
-
-Object.keys(touchControls).forEach(id => {
-    const btn = document.getElementById(id);
-    const keyCode = touchControls[id];
-    btn.ontouchstart = (e) => { e.preventDefault(); keys[keyCode] = true; };
-    btn.ontouchend = (e) => { e.preventDefault(); keys[keyCode] = false; };
-});
+window.onkeyup = e => {
+    if(e.code === 'ArrowLeft') state.movingLeft = false;
+    if(e.code === 'ArrowRight') state.movingRight = false;
+};
 
 document.getElementById('startBtn').onclick = startGame;
 document.getElementById('restartBtn').onclick = () => location.reload();
@@ -191,63 +180,65 @@ function startGame() {
 function loop() {
     if (!state.gameActive) return;
 
-    if (keys['ArrowLeft']) state.vx -= config.moveSpeed;
-    if (keys['ArrowRight']) state.vx += config.moveSpeed;
-    state.vx *= config.friction;
+    // حركة جانبية
+    if (state.movingLeft) state.vx = -config.moveSpeed;
+    else if (state.movingRight) state.vx = config.moveSpeed;
+    else state.vx *= config.friction;
+    
     state.x += state.vx;
 
+    // فيزياء القفز والجاذبية
     state.vy += config.gravity;
     state.y += state.vy;
+    
+    // حركة الكاميرا (الشاشة بتنزل لتحت)
     state.y += state.scrollSpeed;
     state.scrollSpeed += config.difficultyScale;
-    
-    // تحديث نص السرعة
-    let speedLabel = "هادية";
-    if(state.scrollSpeed > 2) speedLabel = "وسط";
-    if(state.scrollSpeed > 3) speedLabel = "شايطة!";
-    speedVal.innerText = speedLabel;
+
+    // تحديث مظهر اللاعب (ميلان حسب الحركة)
+    playerEl.style.transform = `rotate(${state.vx * 2}deg)`;
 
     state.platforms.forEach(p => {
         p.y += state.scrollSpeed;
+        
         if (p.type === 'moving') {
-            p.x += p.dir * (1.5 + state.score/2000);
+            p.x += p.dir * 2;
             if (p.x <= 0 || p.x + p.w >= game.clientWidth) p.dir *= -1;
         }
 
-        if (!p.broken && state.vy >= 0 && 
-            state.x + 55 > p.x && state.x + 15 < p.x + p.w && 
-            state.y + 45 >= p.y && state.y + 45 <= p.y + 15) {
+        // التصادم والقفز التلقائي
+        if (state.vy > 0 && 
+            state.x + 50 > p.x && state.x + 10 < p.x + p.w && 
+            state.y + 45 >= p.y && state.y + 45 <= p.y + 20) {
             
-            state.y = p.y - 48;
-            state.vy = 0;
-            if (p.type === 'moving') state.x += p.dir * (1.5 + state.score/2000);
-
-            if (keys['ArrowUp']) {
-                state.vy = config.jumpForce;
-                if (p.type === 'breakable') { p.broken = true; p.el.style.opacity = '0.3'; }
-            }
+            state.vy = config.jumpForce; // ينط لوحده
+            state.y = p.y - 46;
         }
+        
         p.el.style.left = p.x + 'px';
         p.el.style.top = p.y + 'px';
     });
 
+    // توليد منصات جديدة
     for (let i = state.platforms.length - 1; i >= 0; i--) {
-        if (state.platforms[i].y > 600) {
+        if (state.platforms[i].y > 620) {
             state.platforms[i].el.remove();
             state.platforms.splice(i, 1);
             spawnPlatform(-20);
-            state.score += 5; // نقاط أقل لكل منصة لزيادة التحدي ببطء
+            state.score += 10;
             scoreVal.innerText = state.score;
         }
     }
 
-    if (state.x < -10) state.x = -10;
-    if (state.x > game.clientWidth - 60) state.x = game.clientWidth - 60;
+    // حدود الشاشة
+    if (state.x < -20) state.x = game.clientWidth - 40; // يخرج من الشمال يظهر من اليمين
+    else if (state.x > game.clientWidth - 40) state.x = -20;
 
     playerEl.style.left = state.x + 'px';
     playerEl.style.top = state.y + 'px';
 
-    if (state.y > 600 || state.y < -200) {
+    // خسارة
+    if (state.y > 600 || state.y < -300) {
         state.gameActive = false;
         document.getElementById('gameOverScreen').style.display = 'flex';
         document.getElementById('finalScore').innerText = state.score;
